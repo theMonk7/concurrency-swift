@@ -1,3 +1,4 @@
+
 /// Copyright (c) 2019 Razeware LLC
 /// 
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -58,14 +59,11 @@ extension CollectionViewController {
 
   override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
     let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "normal", for: indexPath) as! PhotoCell
-
-    if let data = try? Data(contentsOf: urls[indexPath.item]),
-      let image = UIImage(data: data) {
-      cell.display(image: image)
-    } else {
-      cell.display(image: nil)
-    }
-
+    
+    cell.display(image: nil)
+//    downloadWithGlobalQueue(at: indexPath)
+    downloadWithUrlSession(at: indexPath)
+    
     return cell
   }
 }
@@ -91,3 +89,37 @@ extension CollectionViewController: UICollectionViewDelegateFlowLayout {
   }
 }
 
+
+// MARK: - Using concurrency
+extension CollectionViewController {
+  
+  private func downloadWithGlobalQueue(at indexPath: IndexPath) {
+    print(indexPath.item)
+    DispatchQueue.global(qos: .utility).async { [weak self] in
+      guard let self = self else { return }
+      
+      let url = self.urls[indexPath.item]
+      guard let data = try? Data(contentsOf: url), let image = UIImage(data: data) else {
+        return
+      }
+      DispatchQueue.main.async {
+        if let cell = self.collectionView.cellForItem(at: indexPath) as? PhotoCell {
+          cell.display(image: image)
+        }
+      }
+    }
+  }
+  
+  private func downloadWithUrlSession(at indexPath: IndexPath) {
+    URLSession.shared.dataTask(with: urls[indexPath.item]) { [weak self] data, response, error in
+      guard let self  = self, let data = data, let image = UIImage(data: data) else {
+        return
+      }
+      DispatchQueue.main.async {
+        if let cell = self.collectionView.cellForItem(at: indexPath) as? PhotoCell {
+          cell.display(image: image)
+        }
+      }
+    }.resume()
+  }
+}
